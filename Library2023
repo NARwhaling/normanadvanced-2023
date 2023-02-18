@@ -20,7 +20,12 @@ END OF NULL VARIABLES***********************************************************
 
 METHODS LIST************************************************************************1
 /*
-    calibrateMotorTicksPerRevolution(port);
+CALIBRATION:
+    calibrateMotorTicks(port);
+        Using the button on the wallaby, manually drive a wheel a full revolution. Returns the tick count
+        of the motor after 5 seconds of not pressing the button.
+        
+    calibrateMotorTicksTool(port);
         Using a physical tool, returns how many ticks there are in a revolution of a motor by pressing
         a bump sensor after 360 degrees of a rotation
         
@@ -28,7 +33,7 @@ METHODS LIST********************************************************************
         After ticks in a revolution have already been found, this method calibrates the offset between
         motor speeds (how far behind in speed one motor is compared to the other) by timing how long it
         takes for each motor to fully rotate (once the tick value is reached)
-        
+DRIVING:
     drive(distanceInCm,speed(1-1500));
         Uses s-curve acceleration to minimize slipping. Also factors in motor offset every time a new speed is
         set for motors in order to ensure straight driving. A ticks/cm (look at turn methods for explanation)
@@ -43,7 +48,7 @@ METHODS LIST********************************************************************
     driveAdvanced(distanceInCm,speed(1-1500),acceleration,jerk);
         Same as the normal drive but you set the acceleration and jerk. A higher number will make the accel/deccel
         faster. A lower number will do the opposite.
-        
+TURNING:
     turnRight(degrees,speed(1-1500));
     turnLeft(degrees,speed(1-1500));
         Like the drive function, turning uses s-curve acceleration to reduce slipping. Using the circumference
@@ -60,7 +65,7 @@ METHODS LIST********************************************************************
     turnLeftAdvanced(degrees,speed(1-1500),accelerationCoefficient);
         Same as the normal turn but you set the acceleration coefficient. A higher number will make the accel/deccel
         faster. A lower number will do the opposite.
-        
+LINE FOLLOWING:
     lineFollow()    etc
 */
 //END OF METHODS LIST***************************************************************
@@ -86,10 +91,12 @@ int slowMotor=0;
 
 //STEP 2: calibrate each motor being used, then calibrate the motor offset****
 /*
-First, build a motor calibration tool by following the instructions in this link:
+EITHER use calibrateMotorTicks(port); which doesn't require a tool or you to remove the motors 
+but does involve human error
+OR build a motor calibration tool by following the instructions in this link:
 https://docs.google.com/document/d/16l_TON05nS6aB2AMCCufq_iQrS7w6adQjx76DrSltB0/edit?usp=sharing
 Once it's built, connect a motor to the tool and run the first calibration method:
-calibrateMotorTicksPerRevolution(port); the port is whichever motor you're calibrating first.
+calibrateMotorTicksTool(port); the port is whichever motor you're calibrating first.
 
 Once both motors are calibrated, reconnect them to the bot and run the motor offset calibration:
 calibrateMotorOffset();
@@ -99,7 +106,7 @@ This finds the difference in speeds between both motors in order to make both mo
 //END OF SETUP***********************************************************************
 
 //CALIBRATION METHODS****************************************************************************3
-void calibrateMotorTicksPerRevolution(int port)
+void calibrateMotorTicksTool(int port)
 {
     printf("Press button when ready.\n");
     while(any_button()==0);
@@ -111,11 +118,42 @@ void calibrateMotorTicksPerRevolution(int port)
     mav(port,0);
     if(port==rightMotor)
     {
-        printf("Set the rightMotorTicksPerRevolution variable equal to %f\n",motorTicksPerRevolution);
+        printf("Set the rightMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
     }
     else
     {
-        printf("Set the leftMotorTicksPerRevolution variable equal to %f\n",motorTicksPerRevolution);
+        printf("Set the leftMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+    }
+}
+
+void calibrateMotorTicks(int port)
+{
+    printf("Pick the bot up and either make a mark on the wheel or watch a certain point on the wheel.\n");
+    printf("Use the button to make the wheel turn a full revolution until the point is back where it started.\n");
+    printf("Pressing the button will make the wheel slowly rotate. You can stutter press it to make minor adjustments,\n");
+    printf(" but after 5 seconds of not being pressed, the ticks/revolution value will be returned.\n");
+    while(any_button()==0);
+    cmpc(port);
+    double timeDifference=seconds();
+    double time=0;
+    while(time<5)
+    {
+        while(any_button==1)
+        {
+            mav(port,100);
+            timeDifference=seconds();
+        }
+        mav(port,0);
+        time=seconds()-timeDifference;
+    }
+    int motorTicksPerRevolution=gmpc(port);
+    if(port==rightMotor)
+    {
+        printf("Set the rightMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+    }
+    else
+    {
+        printf("Set the leftMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
     }
 }
 
@@ -155,12 +193,12 @@ void calibrateMotorOffset()
     if(rightMotorTime<=leftMotorTime)
     {
         motorOffset=rightMotorTime/leftMotorTime;
-        printf("Set the motorOffset variable to %f and the slowMotor variable to 0\n",motorOffset);
+        printf("Set the motorOffset variable to %f and the slowMotor variable to 0.\n",motorOffset);
     }
     else
     {
         motorOffset=leftMotorTime/rightMotorTime;
-        printf("Set the motorOffset variable to %f and the slowMotor variable to 1\n",motorOffset);
+        printf("Set the motorOffset variable to %f and the slowMotor variable to 1.\n",motorOffset);
     }
 }
 //END OF CALIBRATION METHODS******************************************************
@@ -172,6 +210,7 @@ void drive(double distanceInCm,int speed)
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    //Setting equation variables
     double velocity=0;
     double acceleration=2;
     double jerk=1;
@@ -212,14 +251,14 @@ void drive(double distanceInCm,int speed)
                 time=seconds()-timeDifference;
                 velocity=velocity+acceleration*time+0.5*jerk*(time*time);
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             while(velocity>0.001*speed&&phaseNumber==7)
             {
                 time=seconds()-timeDifference;
                 velocity=velocity-(acceleration*time+0.5*jerk*(time*time));
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             phaseNumber=phaseNumber+1;
         }
@@ -230,14 +269,14 @@ void drive(double distanceInCm,int speed)
                 time=seconds()-timeDifference;
                 velocity=velocity+acceleration*time
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             while(velocity>0.3*speed&&phaseNumber==6)
             {
                 time=seconds()-timeDifference;
                 velocity=velocity-acceleration*time
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             phaseNumber=phaseNumber+1;
         }
@@ -248,14 +287,14 @@ void drive(double distanceInCm,int speed)
                 time=seconds()-timeDifference;
                 velocity=velocity+(acceleration*time-0.5*jerk*(time*time));
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             while(velocity>0.7*speed&&phaseNumber==5)
             {
                 time=seconds()-timeDifference;
                 velocity=velocity-(acceleration*time-0.5*jerk*(time*time));
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             phaseNumber=phaseNumber+1;
         }
@@ -267,7 +306,7 @@ void drive(double distanceInCm,int speed)
             //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
             //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
             mav(rightMotor,velocity*rightMotorOffset);
-            mav(leftMotor,velocity(leftMotorOffset);
+            mav(leftMotor,velocity*leftMotorOffset);
             while(gmpc(rightMotor)<rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)<leftWheelTicksPerCm*distanceInCm-leftAccelTicks);
             phaseNumber=phaseNumber+1;
         }
@@ -310,6 +349,7 @@ void driveAdvanced(double distanceInCm,int speed,double acceleration,double jerk
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    //Setting velocity (acceleration and jerk are set in parameters)
     double velocity=0;
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -348,14 +388,14 @@ void driveAdvanced(double distanceInCm,int speed,double acceleration,double jerk
                 time=seconds()-timeDifference;
                 velocity=velocity+acceleration*time+0.5*jerk*(time*time);
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             while(velocity>0.001*speed&&phaseNumber==7)
             {
                 time=seconds()-timeDifference;
                 velocity=velocity-(acceleration*time+0.5*jerk*(time*time));
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             phaseNumber=phaseNumber+1;
         }
@@ -366,14 +406,14 @@ void driveAdvanced(double distanceInCm,int speed,double acceleration,double jerk
                 time=seconds()-timeDifference;
                 velocity=velocity+acceleration*time
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             while(velocity>0.3*speed&&phaseNumber==6)
             {
                 time=seconds()-timeDifference;
                 velocity=velocity-acceleration*time
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             phaseNumber=phaseNumber+1;
         }
@@ -384,14 +424,14 @@ void driveAdvanced(double distanceInCm,int speed,double acceleration,double jerk
                 time=seconds()-timeDifference;
                 velocity=velocity+(acceleration*time-0.5*jerk*(time*time));
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             while(velocity>0.7*speed&&phaseNumber==5)
             {
                 time=seconds()-timeDifference;
                 velocity=velocity-(acceleration*time-0.5*jerk*(time*time));
                 mav(rightMotor,velocity*rightMotorOffset);
-                mav(leftMotor,velocity(leftMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
             }
             phaseNumber=phaseNumber+1;
         }
@@ -403,7 +443,7 @@ void driveAdvanced(double distanceInCm,int speed,double acceleration,double jerk
             //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
             //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
             mav(rightMotor,velocity*rightMotorOffset);
-            mav(leftMotor,velocity(leftMotorOffset);
+            mav(leftMotor,velocity*leftMotorOffset);
             while(gmpc(rightMotor)<rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)<leftWheelTicksPerCm*distanceInCm-leftAccelTicks);
             phaseNumber=phaseNumber+1;
         }
@@ -420,8 +460,110 @@ void turnRight(double degrees,int speed)
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    ticksPerBotRotation=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
+    //Setting equation variables
+    double velocity=0;
+    double acceleration=2;
+    double jerk=1;
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    phase 2 of s-curve: V(t)=Vo+At
+    phase 3 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 6 of s-curve: V(t)=Vo+At
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time+0.5*jerk*(time*time));
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-acceleration*time
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            mav(rightMotor,-1*velocity*rightMotorOffset);
+            mav(leftMotor,velocity*leftMotorOffset);
+            while(gmpc(rightMotor)>-1*ticksPerBotRotation+rightAccelTicks||gmpc(leftMotor)<ticksPerBotRotation-leftAccelTicks);
+            phaseNumber=phaseNumber+1;
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
 
 void turnRightSimple(double degrees,int speed)
@@ -430,18 +572,137 @@ void turnRightSimple(double degrees,int speed)
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    ticksPerBotRotation=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    while(gmpc(rightMotor)>-1*ticksPerBotRotation||gmpc(leftMotor)<ticksPerBotRotation)
+    {
+        mav(rightMotor,-1*speed*rightMotorOffset);
+        mav(leftMotor,speed*leftMotorOffset);
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
 
-void turnRightAdvanced(double degrees,int speed,double accelerationCoefficient)
+void turnRightAdvanced(double degrees,int speed,double acceleration,double jerk)
 {
     cmpc(rightMotor,leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    ticksPerBotRotation=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
+    //Setting equation variables
+    double velocity=0;
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    phase 2 of s-curve: V(t)=Vo+At
+    phase 3 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 6 of s-curve: V(t)=Vo+At
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time+0.5*jerk*(time*time));
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-acceleration*time
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,-1*velocity*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            mav(rightMotor,-1*velocity*rightMotorOffset);
+            mav(leftMotor,velocity*leftMotorOffset);
+            while(gmpc(rightMotor)>-1*ticksPerBotRotation+rightAccelTicks||gmpc(leftMotor)<ticksPerBotRotation-leftAccelTicks);
+            phaseNumber=phaseNumber+1;
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
 
 void turnLeft(double degrees,int speed)
@@ -450,8 +711,110 @@ void turnLeft(double degrees,int speed)
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    ticksPerBotRotation=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
+    //Setting equation variables
+    double velocity=0;
+    double acceleration=2;
+    double jerk=1;
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    phase 2 of s-curve: V(t)=Vo+At
+    phase 3 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 6 of s-curve: V(t)=Vo+At
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time+0.5*jerk*(time*time));
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-acceleration*time
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            mav(rightMotor,velocity*rightMotorOffset);
+            mav(leftMotor,-1*velocity*leftMotorOffset);
+            while(gmpc(rightMotor)<ticksPerBotRotation-rightAccelTicks||gmpc(leftMotor)>-1*ticksPerBotRotation+leftAccelTicks);
+            phaseNumber=phaseNumber+1;
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
 
 void turnLeftSimple(double degrees,int speed)
@@ -460,18 +823,137 @@ void turnLeftSimple(double degrees,int speed)
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    ticksPerBotRotation=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    while(gmpc(rightMotor)<ticksPerBotRotation||gmpc(leftMotor)>-1*ticksPerBotRotation)
+    {
+        mav(rightMotor,speed*rightMotorOffset);
+        mav(leftMotor,-1*speed*leftMotorOffset);
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
 
-void turnLeftAdvanced(double degrees,int speed,double accelerationCoefficient)
+void turnLeftAdvanced(double degrees,int speed,double acceleration,double jerk)
 {
     cmpc(rightMotor,leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    ticksPerBotRotation=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
+    //Setting equation variables
+    double velocity=0;
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    phase 2 of s-curve: V(t)=Vo+At
+    phase 3 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo-(Aot+1/2Jt^2)
+    phase 6 of s-curve: V(t)=Vo+At
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time+0.5*jerk*(time*time));
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+acceleration*time
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-acceleration*time
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity-(acceleration*time-0.5*jerk*(time*time));
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,-1*velocity*leftMotorOffset);
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            mav(rightMotor,velocity*rightMotorOffset);
+            mav(leftMotor,-1*velocity*leftMotorOffset);
+            while(gmpc(rightMotor)<ticksPerBotRotation-rightAccelTicks||gmpc(leftMotor)>-1*ticksPerBotRotation+leftAccelTicks);
+            phaseNumber=phaseNumber+1;
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
 //END OF TURN METHODS*************************************************************
 
