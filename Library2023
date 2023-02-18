@@ -1,1 +1,105 @@
-//sadjhdjahsdw
+#define _USE_MATH_DEFINES
+#include <math.h>
+/*
+CONTENTS (descending order):
+List of all methods 1
+Setup 2
+Calibration methods 3
+Drive methods 4
+*/
+
+METHODS LIST************************************************************************1
+/*
+    drive()
+    turnRight()
+    turnLeft()
+    lineFollow()    etc
+*/
+//END OF METHODS LIST***************************************************************
+
+//SETUP*****************************************************************************2
+//STEP 1: set variables*************************************************************
+int rightMotor = 0;
+int leftMotor = 3;
+int bumpSensorUsedForCalibration=0;
+double wheelDiameterInCm=6.8;
+double distanceBetweenWheelsInCm = 19.9;
+
+//Set these during step 2
+int rightMotorTicksPerRevolution=1924;
+int leftMotorTicksPerRevolution=1922;
+double motorOffset=0;
+//END OF STEP 1*********************************************************************
+
+//STEP 2: calibrate each motor being used, then calibrate the motor offset****
+
+//END OF STEP 2**********************************************************************
+//END OF SETUP***********************************************************************
+
+//CALIBRATION METHODS****************************************************************************3
+void calibrateMotorTicksPerRevolution(int port)
+{
+    printf("Press button when ready.\n");
+    while(any_button()==0);
+    msleep(1000);
+    cmpc(port);
+    mav(port,500);
+    while(bumpSensorUsedForCalibration==0);
+    int motorTicksPerRevolution=gmpc(port);
+    mav(port,0);
+    if(port==rightMotor)
+    {
+        printf("Set the rightMotorTicksPerRevolution variable equal to %f\n",motorTicksPerRevolution);
+    }
+    else
+    {
+        printf("Set the leftMotorTicksPerRevolution variable equal to %f\n",motorTicksPerRevolution);
+    }
+}
+
+void calibrateMotorOffset()
+{
+    printf("Pick the bot up and press button when ready.\n");
+    while(any_button()==0);
+    msleep(1000);
+    cmpc(rightMotor,leftMotor);
+    double rightMotorTime=seconds();
+    double leftMotorTime=seconds();
+    int rightLoopBreak=0;
+    int leftLoopBreak=0;
+    mav(rightMotor,500);
+    mav(leftMotor,500);
+    while(rightLoopBreak==0||leftLoopBreak==0)
+    {
+        if(rightLoopBreak=0)
+        {
+            if(gmpc(rightMotor)>=rightMotorTicksPerRevolution)
+            {
+                rightMotorTime=seconds()-rightMotorTime;
+                rightLoopBreak=1;
+                mav(rightMotor,0);
+            }
+        }
+        if(leftLoopBreak=0)
+        {
+            if(gmpc(leftMotor)>=leftMotorTicksPerRevolution)
+            {
+                leftMotorTime=seconds()-leftMotorTime;
+                leftLoopBreak=1;
+                mav(leftMotor,0);
+            }
+        }
+    }
+    if(rightMotorTime<=leftMotorTime)
+    {
+        motorOffset=rightMotorTime/leftMotorTime;
+    }
+    else
+    {
+        motorOffset=leftMotorTime/rightMotorTime;
+    }
+    printf("Set the motorOffset variable to %f\n",motorOffset);
+}
+//END OF CALIBRATION METHODS******************************************************
+
+//DRIVE METHODS************************************************************************4
