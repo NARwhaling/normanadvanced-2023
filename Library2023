@@ -25,6 +25,11 @@ CALIBRATION:
         Using the button on the wallaby, manually drive a wheel a full revolution. Returns the tick count
         of the motor after 5 seconds of not pressing the button.
         
+    calibrateMotorTicksAdvanced(port);
+        Same as calibrateMotorTicks but lets you set the position of the wheel before the rotation that finds ticks.
+        If you're not marking the wheel, use this and line one of the spokes of the wheel up with something so that
+        after a full rotation they re-align.
+        
     calibrateMotorTicksTool(port);
         Using a physical tool, returns how many ticks there are in a revolution of a motor by pressing
         a bump sensor after 360 degrees of a rotation
@@ -92,11 +97,11 @@ int slowMotor=0;
 //STEP 2: calibrate each motor being used, then calibrate the motor offset****
 /*
 EITHER use calibrateMotorTicks(port); which doesn't require a tool or you to remove the motors 
-but does involve human error
+but does involve human error (calibrateMotorTicksAdvanced(port); can be used too - look at METHODS
+for the description of the difference)
 OR build a motor calibration tool by following the instructions in this link:
 https://docs.google.com/document/d/16l_TON05nS6aB2AMCCufq_iQrS7w6adQjx76DrSltB0/edit?usp=sharing
-Once it's built, connect a motor to the tool and run the first calibration method:
-calibrateMotorTicksTool(port); the port is whichever motor you're calibrating first.
+Once it's built, connect a motor to the tool and run the calibration method: calibrateMotorTicksTool(port);
 
 Once both motors are calibrated, reconnect them to the bot and run the motor offset calibration:
 calibrateMotorOffset();
@@ -136,6 +141,51 @@ void calibrateMotorTicks(int port)
     cmpc(port);
     double timeDifference=seconds();
     double time=0;
+    while(time<5)
+    {
+        while(any_button==1)
+        {
+            mav(port,100);
+            timeDifference=seconds();
+        }
+        mav(port,0);
+        time=seconds()-timeDifference;
+    }
+    int motorTicksPerRevolution=gmpc(port);
+    if(port==rightMotor)
+    {
+        printf("Set the rightMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+    }
+    else
+    {
+        printf("Set the leftMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+    }
+}
+
+void calibrateMotorTicksAdvanced(int port)
+{
+    printf("Pick the bot up and press the button to make the wheel turn to where you want it for the calibration.\n");
+    printf("Pressing the button will make the wheel slowly rotate. You can stutter press it to make minor adjustments,\n");
+    printf(" but after 5 seconds of not being pressed the calibration will start.\n");
+    while(any_button()==0);
+    double timeDifference=seconds();
+    double time=0;
+    while(time<5)
+    {
+        while(any_button==1)
+        {
+            mav(port,100);
+            timeDifference=seconds();
+        }
+        mav(port,0);
+        time=seconds()-timeDifference;
+    }
+    cmpc(port);
+    printf("Now press the button to rotate the wheel one full rotation. Like before, after 5 seconds of not being pressed\n");
+    printf(" the calibration will end and a value will be returned.\n");
+    while(any_button()==0);
+    timeDifference=seconds();
+    time=0;
     while(time<5)
     {
         while(any_button==1)
@@ -984,4 +1034,3 @@ void lineSquareUp()
 
 }
 //END OF LINE SQUARE UP METHODS*******************************************************
-
