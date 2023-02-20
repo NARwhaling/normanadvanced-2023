@@ -2,7 +2,8 @@
 #include <math.h>
 /*
 CONTENTS (descending order):
-Null variables 0
+Null variables *
+Resources 0
 List of all methods 1
 Setup 2
 Calibration methods 3
@@ -12,14 +13,20 @@ Line follow methods 6
 Line square up methods 7
 
 */
-NULL VARIABLES**********************************************************************0
+NULL VARIABLES********************************************************************************************************************************************************
 double rightWheelTicksPerCm;
 double leftWheelTicksPerCm;
 double ticksPerBotRotation;
-END OF NULL VARIABLES***************************************************************
 
-METHODS LIST************************************************************************1
-/*
+/*RESOURCES**********************************************************************************************************************************************************0
+    ACCELERATION PROFILES:
+    https://www.pmdcorp.com/resources/type/articles/get/mathematics-of-motion-control-profiles-article
+    
+    TICKS CALIBRATION TOOL:
+    https://docs.google.com/document/d/16l_TON05nS6aB2AMCCufq_iQrS7w6adQjx76DrSltB0/edit?usp=sharing
+*/
+
+/*METHODS LIST*******************************************************************************************************************************************************1
 CALIBRATION:
     calibrateMotorTicks(port);
         Using the button on the wallaby, manually drive a wheel a full revolution. Returns the tick count
@@ -38,21 +45,21 @@ CALIBRATION:
         After ticks in a revolution have already been found, this method calibrates the offset between
         motor speeds (how far behind in speed one motor is compared to the other) by timing how long it
         takes for each motor to fully rotate (once the tick value is reached)
+        
 DRIVING:
-    drive(distanceInCm,speed(1-1500));
+    drive(distanceInCm(-/+),speed(1-1500));
         Uses s-curve acceleration to minimize slipping. Also factors in motor offset every time a new speed is
         set for motors in order to ensure straight driving. A ticks/cm (look at turn methods for explanation)
-        variable is used to track how far the motors have turned so that accurate distances can be driven.
-        For info about acceleration profiles:
-        https://www.pmdcorp.com/resources/type/articles/get/mathematics-of-motion-control-profiles-article
+        variable is used to track how far the motors have turned so that accurate distances can be driven, and
+        acceleration time is set to 0.5, meaning it takes 0.5 seconds to accelerate and 0.5 seconds to deccelerate.
         
-    driveSimple(distanceInCm,speed(1-1500));
+    driveSimple(distanceInCm(-/+),speed(1-1500));
         Doesn't use any acceleration profiles. Instead just uses the motor offset and ticks/cm variable to
         drive straight for a certain distance.
         
-    driveAdvanced(distanceInCm,speed(1-1500),acceleration,jerk);
-        Same as the normal drive but you set the acceleration and jerk. A higher number will make the accel/deccel
-        faster. A lower number will do the opposite.
+    driveAdvanced(distanceInCm(-/+),speed(1-1500),accelerationTime);
+        Same as the normal drive but you set the accelerationTime variable.
+        
 TURNING:
     turnRight(degrees,speed(1-1500));
     turnLeft(degrees,speed(1-1500));
@@ -70,13 +77,22 @@ TURNING:
     turnLeftAdvanced(degrees,speed(1-1500),accelerationCoefficient);
         Same as the normal turn but you set the acceleration coefficient. A higher number will make the accel/deccel
         faster. A lower number will do the opposite.
+        
 LINE FOLLOWING:
-    lineFollow()    etc
+    lineFollowRight(double distanceInCm,int speed,int port);
+    lineFollowLeft(double distanceInCm,int speed,int port);
+        Line follows on a specific side of the tape. lineFollowRight line follows when the line sensor is on the RIGHT
+        side of the tape, lineFollowLeft line follows when the line sensor is on the LEFT side of the tape. Also, has a
+        set correctionStrength value of 0.2, meaning that the slower motor will always be 0.2*velocity behind
+        the other motor in order to correct. The accelerationTime value is set to 0.5, meaning that it takes 0.5 seconds
+        for each motor to accelerate to full speed and 0.5 seconds to deccelerate to 0 speed.
+    lineFollowRightAdvanced(double distanceInCm,int speed,int port,double correctionStrength,double accelerationTime);
+    lineFollowLeftAdvanced(double distanceInCm,int speed,int port,double correctionStrength,double accelerationTime);
+        Same as the normal line follow but allows you to set the correctionStrength and accelerationTime variables.
 */
-//END OF METHODS LIST***************************************************************
 
-//SETUP*****************************************************************************2
-//STEP 1: set variables*************************************************************
+//SETUP**************************************************************************************************************************************************************2
+//STEP 1: set variables
 int rightMotor = 0;
 int leftMotor = 3;
 int bumpSensor=0;
@@ -92,7 +108,6 @@ int leftMotorTicksPerRevolution=1922;
 double motorOffset=0.95;
 int slowMotor=0;
 //^used to tell which motor the motorOffset needs to be applied to (the faster one)
-//END OF STEP 1*********************************************************************
 
 //STEP 2: calibrate each motor being used, then calibrate the motor offset****
 /*
@@ -107,10 +122,8 @@ Once both motors are calibrated, reconnect them to the bot and run the motor off
 calibrateMotorOffset();
 This finds the difference in speeds between both motors in order to make both motors run at the same speed.
 */
-//END OF STEP 2**********************************************************************
-//END OF SETUP***********************************************************************
 
-//CALIBRATION METHODS****************************************************************************3
+//CALIBRATION METHODS************************************************************************************************************************************************3
 void calibrateMotorTicksTool(int port)
 {
     printf("Press button when ready.\n");
@@ -251,9 +264,8 @@ void calibrateMotorOffset()
         printf("Set the motorOffset variable to %f and the slowMotor variable to 1.\n",motorOffset);
     }
 }
-//END OF CALIBRATION METHODS******************************************************
 
-//DRIVE METHODS************************************************************************4
+//DRIVE METHODS******************************************************************************************************************************************************4
 void drive(double distanceInCm,int speed)
 {
     cmpc(rightMotor,leftMotor);
@@ -264,8 +276,9 @@ void drive(double distanceInCm,int speed)
     double accelerationTime=0.5;
     double velocity=0;
     double acceleration;
-    //Finding accelerationConstant and jerk based on how long it takes to reach full velocity (acceleration time)
+    //Finding accelerationConstant for phase 2
     double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
     double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -477,8 +490,9 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
     //Setting equation variables
     double velocity=0;
     double acceleration;
-    //Finding accelerationConstant and jerk based on how long it takes to reach full velocity (acceleration time)
+    //Finding accelerationConstant for phase 2
     double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
     double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -641,9 +655,8 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
     mav(rightMotor,0);
     mav(leftMotor,0);
 }
-//END OF DRIVE METHODS************************************************************
 
-//TURN METHODS*************************************************************************5
+//TURN METHODS*******************************************************************************************************************************************************5
 void turnRight(double degrees,int speed)
 {
     cmpc(rightMotor,leftMotor);
@@ -657,8 +670,9 @@ void turnRight(double degrees,int speed)
     double accelerationTime=0.5;
     double velocity=0;
     double acceleration;
-    //Finding accelerationConstant and jerk based on how long it takes to reach full velocity (acceleration time)
+    //Finding accelerationConstant for phase 2
     double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
     double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -808,8 +822,9 @@ void turnRightAdvanced(double degrees,int speed,double accelerationTime)
     //Setting equation variables
     double velocity=0;
     double acceleration;
-    //Finding accelerationConstant and jerk based on how long it takes to reach full velocity (acceleration time)
+    //Finding accelerationConstant for phase 2
     double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
     double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -929,8 +944,9 @@ void turnLeft(double degrees,int speed)
     double accelerationTime=0.5;
     double velocity=0;
     double acceleration;
-    //Finding accelerationConstant and jerk based on how long it takes to reach full velocity (acceleration time)
+    //Finding accelerationConstant for phase 2
     double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
     double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -1080,8 +1096,9 @@ void turnLeftAdvanced(double degrees,int speed,double accelerationTime)
     //Setting equation variables
     double velocity=0;
     double acceleration;
-    //Finding accelerationConstant and jerk based on how long it takes to reach full velocity (acceleration time)
+    //Finding accelerationConstant for phase 2
     double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
     double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
     //determine which motor needs to be slowed down (the one with the offset)
@@ -1187,32 +1204,719 @@ void turnLeftAdvanced(double degrees,int speed,double accelerationTime)
     mav(rightMotor,0);
     mav(leftMotor,0);
 }
-//END OF TURN METHODS*************************************************************
 
-//LINE FOLLOW METHODS*****************************************************************6
-void lineFollowRight(double distanceInCm,int speed)
+//LINE FOLLOW METHODS************************************************************************************************************************************************6
+void lineFollowRight(double distanceInCm,int speed,int port)
 {
     cmpc(rightMotor,leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    //Setting equation variables
+    double correctionStrength=0.2;
+    double accelerationTime=0.5;
+    double velocity=0;
+    double acceleration;
+    //Finding accelerationConstant for phase 2
+    double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
+    double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    phase 2 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 3 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 6 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            if(analog(port)<lineSensorThreshold)
+            {
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+            }
+            else
+            {
+                mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            {
+                phaseNumber=phaseNumber+1;
+            }
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
-void lineFollowLeft(double distanceInCm,int speed)
+
+void lineFollowRightAdvanced(double distanceInCm,int speed,int port,double correctionStrength,double accelerationTime)
 {
     cmpc(rightMotor,leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    //Setting equation variables
+    double velocity=0;
+    double acceleration;
+    //Finding accelerationConstant for phase 2
+    double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
+    double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
     
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
     
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    phase 2 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 3 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 6 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)<lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            if(analog(port)<lineSensorThreshold)
+            {
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+            }
+            else
+            {
+                mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            {
+                phaseNumber=phaseNumber+1;
+            }
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
 }
-//END OF LINE FOLLOW METHODS**********************************************************
+void lineFollowLeft(double distanceInCm,int speed,int port)
+{
+    cmpc(rightMotor,leftMotor);
+    //Giving null variables values
+    rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    //Setting equation variables
+    double correctionStrength=0.2;
+    double accelerationTime=0.5;
+    double velocity=0;
+    double acceleration;
+    //Finding accelerationConstant for phase 2
+    double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
+    double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
+    
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
+    
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    phase 2 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 3 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 6 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            if(analog(port)>lineSensorThreshold)
+            {
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+            }
+            else
+            {
+                mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            {
+                phaseNumber=phaseNumber+1;
+            }
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
+}
 
-//LINE SQUARE UP METHODS**************************************************************7
+void lineFollowLeftAdvanced(double distanceInCm,int speed,int port,double correctionStrength,double accelerationTime)
+{
+    cmpc(rightMotor,leftMotor);
+    //Giving null variables values
+    rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
+    //Setting equation variables
+    double velocity=0;
+    double acceleration;
+    //Finding accelerationConstant for phase 2
+    double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
+    double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
+    
+    //determine which motor needs to be slowed down (the one with the offset)
+    if(slowMotor==0)
+    {
+        rightMotorOffset=1;
+        leftMotorOffset=motorOffset;
+    }
+    else
+    {
+        rightMotorOffset=motorOffset;
+        leftMotorOffset=1;
+    }
+    
+    /*
+    phase 1 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    phase 2 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 3 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 4 of s-curve: V(t)=Vo
+    phase 5 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao-Jt
+    phase 6 of s-curve: V(t)=Vo+At, A(t)=Ao
+    phase 7 of s-curve: V(t)=Vo+Aot+1/2Jt^2, A(t)=Ao+Jt
+    */
+    
+    int phaseNumber=1;
+    //^condition variable that determines which equation will be used
+    double timeDifference;
+    double time;
+    while(phaseNumber<8)
+    {
+        timeDifference=seconds();
+        if(phaseNumber==1||phaseNumber==7)
+        {
+            while(velocity<0.3*speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.001*speed&&phaseNumber==7)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration+jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==2||phaseNumber==6)
+        {
+            while(velocity<0.7*speed)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.3*speed&&phaseNumber==6)
+            {
+                time=seconds()-timeDifference;
+                velocity=velocity+accelerationConstant*time;
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==3||phaseNumber==5)
+        {
+            while(velocity<speed)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            while(velocity>0.7*speed&&phaseNumber==5)
+            {
+                time=seconds()-timeDifference;
+                acceleration=acceleration-jerk*time;
+                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                if(analog(port)>lineSensorThreshold)
+                {
+                    mav(rightMotor,velocity*rightMotorOffset);
+                    mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+                }
+                else
+                {
+                    mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                    mav(leftMotor,velocity*leftMotorOffset);
+                }
+            }
+            phaseNumber=phaseNumber+1;
+        }
+        else if(phaseNumber==4)
+        {
+            time=seconds()-timeDifference;
+            int rightAccelTicks=gmpc(rightMotor);
+            int leftAccelTicks=gmpc(leftMotor);
+            //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
+            //Theoretically, decelerating will take the same amount of ticks, so we want to preserve equal distance at the end for deceleration
+            if(analog(port)>lineSensorThreshold)
+            {
+                mav(rightMotor,velocity*rightMotorOffset);
+                mav(leftMotor,(velocity-correctionStrength*velocity)*leftMotorOffset);
+            }
+            else
+            {
+                mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
+                mav(leftMotor,velocity*leftMotorOffset);
+            }
+            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            {
+                phaseNumber=phaseNumber+1;
+            }
+        }
+    }
+    mav(rightMotor,0);
+    mav(leftMotor,0);
+}
+
+//LINE SQUARE UP METHODS*********************************************************************************************************************************************7
 void lineSquareUp()
 {
-
+    
 }
-//END OF LINE SQUARE UP METHODS*******************************************************
+
+//
