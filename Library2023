@@ -1,41 +1,3 @@
-/*
-    jerk=1;
-    int check=1;
-    while(check==1)
-    {
-        //p1
-        time=0.3*accelerationTime;
-        acceleration=acceleration+jerk*time;
-        velocity=velocity+acceleration*time+0.5*jerk*(time*time);
-        
-        //p2
-        time=0.7*accelerationTime;
-        velocity=velocity+acceleration*time;
-        
-        //p3
-        time=accelerationTime;
-        acceleration=acceleration+jerk*time;
-        velocity=velocity+acceleration*time+0.5*jerk*(time*time);
-        
-        if(velocity>=velocity-50&&velocity<=velocity+50)
-        {
-            check=0;
-        }
-        else
-        {
-            if(velocity>speed)
-            {
-                jerk=jerk-jerk*0.5;
-            }
-            else
-            {
-                jerk=jerk+jerk*0.5;
-            }
-        }
-        acceleration=0;
-        velocity=0;
-    }
-*/
 #define _USE_MATH_DEFINES
 #include <math.h>
 /*
@@ -51,10 +13,16 @@ Line follow methods 6
 Line square up methods 7
 
 */
-NULL VARIABLES********************************************************************************************************************************************************
+//NULL VARIABLES******************************************************************************************************************************************************
 double rightWheelTicksPerCm;
 double leftWheelTicksPerCm;
 double ticksPerBotRotation;
+double rightMotorOffset;
+double leftMotorOffset;
+double rightWheelDistance;
+double leftWheelDistance;
+double cmsForEachWheelToCover;
+
 
 /*RESOURCES**********************************************************************************************************************************************************0
     ACCELERATION PROFILES:
@@ -131,19 +99,19 @@ LINE FOLLOWING:
 
 //SETUP**************************************************************************************************************************************************************2
 //STEP 1: set variables
-int rightMotor = 0;
-int leftMotor = 3;
+int rightMotor = 3;
+int leftMotor = 0;
 int bumpSensor=0;
-int lineSensor=0;
+int lineSensor=3;
 double wheelDiameterInCm=6.8;
-double distanceBetweenWheelsInCm = 19.9;
-int lineSensorThreshold=1500;
+double distanceBetweenWheelsInCm = 13.4;
+int lineSensorThreshold=1750;
 //^a value that is never reached when sensing on white and is always less than when on black
 
 //Set these during step 2
-int rightMotorTicksPerRevolution=1924;
-int leftMotorTicksPerRevolution=1922;
-double motorOffset=0.95;
+int rightMotorTicksPerRevolution=1941;
+int leftMotorTicksPerRevolution=1443;
+double motorOffset=0.744293;
 int slowMotor=0;
 //^used to tell which motor the motorOffset needs to be applied to (the faster one)
 
@@ -174,11 +142,11 @@ void calibrateMotorTicksTool(int port)
     mav(port,0);
     if(port==rightMotor)
     {
-        printf("Set the rightMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+        printf("Set the rightMotorTicksPerRevolution variable equal to %d.\n",motorTicksPerRevolution);
     }
     else
     {
-        printf("Set the leftMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+        printf("Set the leftMotorTicksPerRevolution variable equal to %d.\n",motorTicksPerRevolution);
     }
 }
 
@@ -194,9 +162,9 @@ void calibrateMotorTicks(int port)
     double time=0;
     while(time<5)
     {
-        while(any_button==1)
+        while(any_button()==1)
         {
-            mav(port,100);
+            mav(port,200);
             timeDifference=seconds();
         }
         mav(port,0);
@@ -205,11 +173,11 @@ void calibrateMotorTicks(int port)
     int motorTicksPerRevolution=gmpc(port);
     if(port==rightMotor)
     {
-        printf("Set the rightMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+        printf("Set the rightMotorTicksPerRevolution variable equal to %d.\n",motorTicksPerRevolution);
     }
     else
     {
-        printf("Set the leftMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+        printf("Set the leftMotorTicksPerRevolution variable equal to %d.\n",motorTicksPerRevolution);
     }
 }
 
@@ -223,9 +191,9 @@ void calibrateMotorTicksAdvanced(int port)
     double time=0;
     while(time<5)
     {
-        while(any_button==1)
+        while(any_button()==1)
         {
-            mav(port,100);
+            mav(port,200);
             timeDifference=seconds();
         }
         mav(port,0);
@@ -239,9 +207,9 @@ void calibrateMotorTicksAdvanced(int port)
     time=0;
     while(time<5)
     {
-        while(any_button==1)
+        while(any_button()==1)
         {
-            mav(port,100);
+            mav(port,200);
             timeDifference=seconds();
         }
         mav(port,0);
@@ -250,11 +218,11 @@ void calibrateMotorTicksAdvanced(int port)
     int motorTicksPerRevolution=gmpc(port);
     if(port==rightMotor)
     {
-        printf("Set the rightMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+        printf("Set the rightMotorTicksPerRevolution variable equal to %d.\n",motorTicksPerRevolution);
     }
     else
     {
-        printf("Set the leftMotorTicksPerRevolution variable equal to %f.\n",motorTicksPerRevolution);
+        printf("Set the leftMotorTicksPerRevolution variable equal to %d.\n",motorTicksPerRevolution);
     }
 }
 
@@ -263,16 +231,17 @@ void calibrateMotorOffset()
     printf("Pick the bot up and press button when ready.\n");
     while(any_button()==0);
     msleep(1000);
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     double rightMotorTime=seconds();
     double leftMotorTime=seconds();
     int rightLoopBreak=0;
     int leftLoopBreak=0;
-    mav(rightMotor,500);
-    mav(leftMotor,500);
+    mav(rightMotor,200);
+    mav(leftMotor,200);
     while(rightLoopBreak==0||leftLoopBreak==0)
     {
-        if(rightLoopBreak=0)
+        if(rightLoopBreak==0)
         {
             if(gmpc(rightMotor)>=rightMotorTicksPerRevolution)
             {
@@ -281,7 +250,7 @@ void calibrateMotorOffset()
                 mav(rightMotor,0);
             }
         }
-        if(leftLoopBreak=0)
+        if(leftLoopBreak==0)
         {
             if(gmpc(leftMotor)>=leftMotorTicksPerRevolution)
             {
@@ -294,19 +263,20 @@ void calibrateMotorOffset()
     if(rightMotorTime<=leftMotorTime)
     {
         motorOffset=rightMotorTime/leftMotorTime;
-        printf("Set the motorOffset variable to %f and the slowMotor variable to 0.\n",motorOffset);
+        printf("Set the motorOffset variable to %f and the slowMotor variable to 1.\n",motorOffset);
     }
     else
     {
         motorOffset=leftMotorTime/rightMotorTime;
-        printf("Set the motorOffset variable to %f and the slowMotor variable to 1.\n",motorOffset);
+        printf("Set the motorOffset variable to %f and the slowMotor variable to 0.\n",motorOffset);
     }
 }
 
 //DRIVE METHODS******************************************************************************************************************************************************4
 void drive(double distanceInCm,int speed)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
@@ -482,7 +452,8 @@ void drive(double distanceInCm,int speed)
 
 void driveSimple(double distanceInCm,int speed)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
@@ -521,18 +492,48 @@ void driveSimple(double distanceInCm,int speed)
 
 void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     //Setting equation variables
     double velocity=0;
-    double acceleration;
-    //Finding accelerationConstant for phase 2
-    double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
-    //Finding jerk using phase 3 (because Ao is already defined as accelerationConstant)
-    double jerk=2*(speed-speed*0.7-accelerationConstant*accelerationTime)/(accelerationTime*accelerationTime);
-    
+    double acceleration=0;
+    //double accelerationConstant=((speed*0.7)-(speed*0.3))/(accelerationTime*0.7);
+    double jerk=1;
+    int check=1;
+    double time;
+    while(check==1)
+    {
+        //p1
+        time=0.3*accelerationTime;
+        acceleration=acceleration+jerk*time;
+        velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+        
+        //p2
+        time=0.7*accelerationTime;
+        velocity=velocity+acceleration*time;
+        
+        //p3
+        time=accelerationTime;
+        acceleration=acceleration+jerk*time;
+        velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+        
+        if(velocity>=speed-50&&velocity<=speed+50)
+        {
+            check=0;
+        }
+        else
+        {
+            jerk=jerk-0.00001;
+        }
+        acceleration=0;
+        velocity=0;
+    }
+    printf("----%f----",jerk);
+    msleep(10000);
+    jerk=0.0008;
     //determine which motor needs to be slowed down (the one with the offset)
     if(slowMotor==0)
     {
@@ -557,15 +558,16 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
     
     int phaseNumber=1;
     //^condition variable that determines which equation will be used
-    double timeDifference;
-    double time;
+    double timeDifference=seconds();
     while(phaseNumber<8)
     {
-        timeDifference=seconds();
         if(phaseNumber==1||phaseNumber==7)
         {
-            while(velocity<0.3*speed)
+            printf("P7\n");
+            timeDifference=seconds();
+            while(seconds()-timeDifference<0.3*accelerationTime&&phaseNumber==1)
             {
+                msleep(1);
                 time=seconds()-timeDifference;
                 acceleration=acceleration+jerk*time;
                 velocity=velocity+acceleration*time+0.5*jerk*(time*time);
@@ -580,8 +582,9 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
                     mav(leftMotor,velocity*leftMotorOffset);
                 }
             }
-            while(velocity>0.001*speed&&phaseNumber==7)
+            while(seconds()-timeDifference<0.3*accelerationTime&&phaseNumber==7)
             {
+                msleep(1);
                 time=seconds()-timeDifference;
                 acceleration=acceleration+jerk*time;
                 velocity=velocity+acceleration*time+0.5*jerk*(time*time);
@@ -600,10 +603,12 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
         }
         else if(phaseNumber==2||phaseNumber==6)
         {
-            while(velocity<0.7*speed)
+            timeDifference=seconds();
+            while(seconds()-timeDifference<0.4*accelerationTime&&phaseNumber==2)
             {
+                msleep(1);
                 time=seconds()-timeDifference;
-                velocity=velocity+accelerationConstant*time;
+                velocity=velocity+acceleration*time;
                 if(distanceInCm<0)
                 {
                     mav(rightMotor,-1*velocity*rightMotorOffset);
@@ -615,10 +620,11 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
                     mav(leftMotor,velocity*leftMotorOffset);
                 }
             }
-            while(velocity>0.3*speed&&phaseNumber==6)
+            while(seconds()-timeDifference<0.4*accelerationTime&&phaseNumber==6)
             {
+                msleep(1);
                 time=seconds()-timeDifference;
-                velocity=velocity+accelerationConstant*time;
+                velocity=velocity+acceleration*time;
                 if(distanceInCm<0)
                 {
                     mav(rightMotor,-1*velocity*rightMotorOffset);
@@ -634,11 +640,13 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
         }
         else if(phaseNumber==3||phaseNumber==5)
         {
-            while(velocity<speed)
+            timeDifference=seconds();
+            while(seconds()-timeDifference<accelerationTime*0.3&&phaseNumber==3)
             {
+                msleep(1);
                 time=seconds()-timeDifference;
                 acceleration=acceleration-jerk*time;
-                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                velocity=velocity+acceleration*time-0.5*jerk*(time*time);
                 if(distanceInCm<0)
                 {
                     mav(rightMotor,-1*velocity*rightMotorOffset);
@@ -650,11 +658,19 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
                     mav(leftMotor,velocity*leftMotorOffset);
                 }
             }
-            while(velocity>0.7*speed&&phaseNumber==5)
+            
+            if(phaseNumber==5)
             {
+                timeDifference=seconds();
+                acceleration=0;
+            }
+            
+            while(seconds()-timeDifference<0.3*accelerationTime&&phaseNumber==5)
+            {
+                msleep(1);
                 time=seconds()-timeDifference;
                 acceleration=acceleration-jerk*time;
-                velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+                velocity=velocity+acceleration*time-0.5*jerk*(time*time);
                 if(distanceInCm<0)
                 {
                     mav(rightMotor,-1*velocity*rightMotorOffset);
@@ -670,7 +686,7 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
         }
         else if(phaseNumber==4)
         {
-            time=seconds()-timeDifference;
+            printf("acceleration:%f",acceleration);
             int rightAccelTicks=gmpc(rightMotor);
             int leftAccelTicks=gmpc(leftMotor);
             //^The amount of ticks it took for each motor to accelerate to mav velocity (whatever speed is)
@@ -683,6 +699,7 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
             }
             else
             {
+                printf("hi");
                 mav(rightMotor,velocity*rightMotorOffset);
                 mav(leftMotor,velocity*leftMotorOffset);
                 while(gmpc(rightMotor)<rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)<leftWheelTicksPerCm*distanceInCm-leftAccelTicks);
@@ -692,18 +709,20 @@ void driveAdvanced(double distanceInCm,int speed,double accelerationTime)
     }
     mav(rightMotor,0);
     mav(leftMotor,0);
+    printf("acceleration2:%f",acceleration);
 }
 
 //TURN METHODS*******************************************************************************************************************************************************5
 void turnRight(double degrees,int speed)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     cmsForEachWheelToCover=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     rightWheelDistance=cmsForEachWheelToCover*rightWheelTicksPerCm;
-    leftWheelDistance=cmsForEachWheelToCover*lefttWheelTicksPerCm;
+    leftWheelDistance=cmsForEachWheelToCover*leftWheelTicksPerCm;
     //Setting equation variables
     double accelerationTime=0.5;
     double velocity=0;
@@ -819,13 +838,14 @@ void turnRight(double degrees,int speed)
 
 void turnRightSimple(double degrees,int speed)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     cmsForEachWheelToCover=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     rightWheelDistance=cmsForEachWheelToCover*rightWheelTicksPerCm;
-    leftWheelDistance=cmsForEachWheelToCover*lefttWheelTicksPerCm;
+    leftWheelDistance=cmsForEachWheelToCover*leftWheelTicksPerCm;
     
     //determine which motor needs to be slowed down (the one with the offset)
     if(slowMotor==0)
@@ -850,13 +870,14 @@ void turnRightSimple(double degrees,int speed)
 
 void turnRightAdvanced(double degrees,int speed,double accelerationTime)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     cmsForEachWheelToCover=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     rightWheelDistance=cmsForEachWheelToCover*rightWheelTicksPerCm;
-    leftWheelDistance=cmsForEachWheelToCover*lefttWheelTicksPerCm;
+    leftWheelDistance=cmsForEachWheelToCover*leftWheelTicksPerCm;
     //Setting equation variables
     double velocity=0;
     double acceleration;
@@ -971,13 +992,14 @@ void turnRightAdvanced(double degrees,int speed,double accelerationTime)
 
 void turnLeft(double degrees,int speed)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     cmsForEachWheelToCover=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     rightWheelDistance=cmsForEachWheelToCover*rightWheelTicksPerCm;
-    leftWheelDistance=cmsForEachWheelToCover*lefttWheelTicksPerCm;
+    leftWheelDistance=cmsForEachWheelToCover*leftWheelTicksPerCm;
     //Setting equation variables
     double accelerationTime=0.5;
     double velocity=0;
@@ -1093,13 +1115,14 @@ void turnLeft(double degrees,int speed)
 
 void turnLeftSimple(double degrees,int speed)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     cmsForEachWheelToCover=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     rightWheelDistance=cmsForEachWheelToCover*rightWheelTicksPerCm;
-    leftWheelDistance=cmsForEachWheelToCover*lefttWheelTicksPerCm;
+    leftWheelDistance=cmsForEachWheelToCover*leftWheelTicksPerCm;
     
     //determine which motor needs to be slowed down (the one with the offset)
     if(slowMotor==0)
@@ -1124,13 +1147,14 @@ void turnLeftSimple(double degrees,int speed)
 
 void turnLeftAdvanced(double degrees,int speed,double accelerationTime)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     cmsForEachWheelToCover=0.5*(distanceBetweenWheelsInCm*M_PI)*(degrees/360);
     rightWheelDistance=cmsForEachWheelToCover*rightWheelTicksPerCm;
-    leftWheelDistance=cmsForEachWheelToCover*lefttWheelTicksPerCm;
+    leftWheelDistance=cmsForEachWheelToCover*leftWheelTicksPerCm;
     //Setting equation variables
     double velocity=0;
     double acceleration;
@@ -1246,7 +1270,8 @@ void turnLeftAdvanced(double degrees,int speed,double accelerationTime)
 //LINE FOLLOW METHODS************************************************************************************************************************************************6
 void lineFollowRight(double distanceInCm,int speed,int port)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
@@ -1412,7 +1437,7 @@ void lineFollowRight(double distanceInCm,int speed,int port)
                 mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
                 mav(leftMotor,velocity*leftMotorOffset);
             }
-            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            if(gmpc(rightMotor)>=rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)>=leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
             {
                 phaseNumber=phaseNumber+1;
             }
@@ -1424,7 +1449,8 @@ void lineFollowRight(double distanceInCm,int speed,int port)
 
 void lineFollowRightAdvanced(double distanceInCm,int speed,int port,double correctionStrength,double accelerationTime)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
@@ -1588,7 +1614,7 @@ void lineFollowRightAdvanced(double distanceInCm,int speed,int port,double corre
                 mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
                 mav(leftMotor,velocity*leftMotorOffset);
             }
-            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            if(gmpc(rightMotor)>=rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)>=leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
             {
                 phaseNumber=phaseNumber+1;
             }
@@ -1599,7 +1625,8 @@ void lineFollowRightAdvanced(double distanceInCm,int speed,int port,double corre
 }
 void lineFollowLeft(double distanceInCm,int speed,int port)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
@@ -1765,7 +1792,7 @@ void lineFollowLeft(double distanceInCm,int speed,int port)
                 mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
                 mav(leftMotor,velocity*leftMotorOffset);
             }
-            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            if(gmpc(rightMotor)>=rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)>=leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
             {
                 phaseNumber=phaseNumber+1;
             }
@@ -1777,7 +1804,8 @@ void lineFollowLeft(double distanceInCm,int speed,int port)
 
 void lineFollowLeftAdvanced(double distanceInCm,int speed,int port,double correctionStrength,double accelerationTime)
 {
-    cmpc(rightMotor,leftMotor);
+    cmpc(rightMotor);
+    cmpc(leftMotor);
     //Giving null variables values
     rightWheelTicksPerCm=rightMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
     leftWheelTicksPerCm=leftMotorTicksPerRevolution/(wheelDiameterInCm*M_PI);
@@ -1941,7 +1969,7 @@ void lineFollowLeftAdvanced(double distanceInCm,int speed,int port,double correc
                 mav(rightMotor,(velocity-correctionStrength*velocity)*rightMotorOffset);
                 mav(leftMotor,velocity*leftMotorOffset);
             }
-            if(gmpc(rightMotor)=>rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)=>leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
+            if(gmpc(rightMotor)>=rightWheelTicksPerCm*distanceInCm-rightAccelTicks||gmpc(leftMotor)>=leftWheelTicksPerCm*distanceInCm-leftAccelTicks)
             {
                 phaseNumber=phaseNumber+1;
             }
