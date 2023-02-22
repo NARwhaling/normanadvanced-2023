@@ -1,3 +1,41 @@
+/*
+    jerk=1;
+    int check=1;
+    while(check==1)
+    {
+        //p1
+        time=0.3*accelerationTime;
+        acceleration=acceleration+jerk*time;
+        velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+        
+        //p2
+        time=0.7*accelerationTime;
+        velocity=velocity+acceleration*time;
+        
+        //p3
+        time=accelerationTime;
+        acceleration=acceleration+jerk*time;
+        velocity=velocity+acceleration*time+0.5*jerk*(time*time);
+        
+        if(velocity>=velocity-50&&velocity<=velocity+50)
+        {
+            check=0;
+        }
+        else
+        {
+            if(velocity>speed)
+            {
+                jerk=jerk-jerk*0.5;
+            }
+            else
+            {
+                jerk=jerk+jerk*0.5;
+            }
+        }
+        acceleration=0;
+        velocity=0;
+    }
+*/
 #define _USE_MATH_DEFINES
 #include <math.h>
 /*
