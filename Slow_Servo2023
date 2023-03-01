@@ -19,9 +19,12 @@ Best to stay within the range 0 - 40 for speed
                 set_servo_position(port, curr_pos); 
                 msleep(30);
 
-                curr_pos = curr_pos + speed; //adds desired speed to the current position          }
+                curr_pos = curr_pos + speed; //adds desired speed to the current position
+                
+            }
+            
         }
-
+        
         if(curr_pos > pos)
         {
             while(curr_pos > pos)//if current position is greater than desired position - moves arm/claw down
@@ -29,11 +32,11 @@ Best to stay within the range 0 - 40 for speed
                 set_servo_position(port, curr_pos);
                 msleep(30);
 
-                curr_pos = curr_pos - speed; //subtracts desired speed to the current position             }
+                curr_pos = curr_pos - speed; //subtracts desired speed to the current position
+            }
         }
-
-    }
-
+        
+     }
     return 0;
 }
 
