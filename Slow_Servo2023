@@ -21,8 +21,7 @@ Best to stay within the range 0 - 40 for speed
 
                 curr_pos = curr_pos + speed; //adds desired speed to the current position
                 
-            }
-            
+            }           
         }
         
         if(curr_pos > pos)
