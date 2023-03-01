@@ -1,0 +1,41 @@
+#include <kipr/wombat.h>
+
+int main() 
+{
+   /*
+Contributor:  Harouna Saho 
+Simple servo function for slower movement  
+Best to stay within the range 0 - 40 for speed 
+*/
+    void servo_slow(int port, int pos, int speed) // port number, desired position, desired speed
+    {
+        enable_servos();
+        int curr_pos = get_servo_position(port); 
+
+        if(curr_pos < pos)  //if current position is less than desired position - moves arm/claw up
+        {
+            while(curr_pos < pos) 
+            {
+                set_servo_position(port, curr_pos); 
+                msleep(30);
+
+                curr_pos = curr_pos + speed; //adds desired speed to the current position          }
+        }
+
+        if(curr_pos > pos)
+        {
+            while(curr_pos > pos)//if current position is greater than desired position - moves arm/claw down
+            {
+                set_servo_position(port, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos - speed; //subtracts desired speed to the current position             }
+        }
+
+    }
+
+    return 0;
+}
+
+
+
