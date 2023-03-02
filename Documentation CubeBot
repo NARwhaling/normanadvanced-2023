@@ -1,0 +1,122 @@
+int main() 
+{
+
+void arm_reset(int time)
+{
+    motor(0, -20);
+    msleep(time); 
+}
+
+    
+void go_to(int port, int position, int speed)
+{
+clear_motor_position_counter(port);
+
+void move_motor()
+{
+    while(get_motor_position_counter(port) < position)
+    {
+      motor(port, speed);
+    }    
+    while(get_motor_position_counter(port) > position)
+     {          
+       motor(port, -speed);
+     }
+}
+    move_motor();
+
+}
+   void claw_slow(int portC,int posC, int speedC) //port, position (0 - 2047), speed ( 0 - 30) is best 
+    {
+        enable_servos();
+        int curr_pos = get_servo_position(portC); 
+
+        if(curr_pos < posC)  //if position is less than - moves arm/claw up
+        {
+            while(curr_pos < posC) 
+            {
+                set_servo_position(portC, curr_pos); 
+                msleep(30);
+
+                curr_pos = curr_pos + speedC; //adds desired speed to the current position            
+            }
+        }
+
+        if(curr_pos > posC)
+        {
+            while(curr_pos > posC)//if position is greater than - moves arm/claw down
+            {
+                set_servo_position(portC, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos - speedC; //subtracts desired speed to the current position             
+            }
+        }
+    }
+    //go_to(0, 800, 10);
+
+ void set_motor_position_and_move_claw(int portC,int posC, int speedC)
+ {
+     void claw_slow() //port, position (0 - 2047), speed ( 0 - 30) is best 
+    {
+        enable_servos();
+        int curr_pos = get_servo_position(portC); 
+
+        if(curr_pos < posC)  //if position is less than - moves arm/claw up
+        {
+            while(curr_pos < posC) 
+            {
+                set_servo_position(portC, curr_pos); 
+                msleep(30);
+
+                curr_pos = curr_pos + speedC; //adds desired speed to the current position            
+            }
+        }
+
+        if(curr_pos > posC)
+        {
+            while(curr_pos > posC)//if position is greater than - moves arm/claw down
+            {
+                set_servo_position(portC, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos - speedC; //subtracts desired speed to the current position             
+            }
+        }
+    }
+void motor_resist() 
+{
+    double time = .0001;
+    motor(0, time);
+    msleep(3000);
+} 
+     
+thread motor_resistT = thread_create(motor_resist);
+thread claw_slowT = thread_create(claw_slow);
+
+     thread_start(motor_resistT); 
+     thread_start(claw_slowT); 
+
+     thread_wait(motor_resistT);
+     thread_wait(claw_slowT);
+     thread_destroy(motor_resistT);
+     thread_destroy(claw_slowT);
+ }
+    
+   
+        go_to(0, 740, 20);
+        set_motor_position_and_move_claw(1, 0,20); 
+
+        set_motor_position_and_move_claw(0, 0 ,35);   
+        set_motor_position_and_move_claw(1, 1600,20); 
+
+        go_to(0, -470, 20);
+        set_motor_position_and_move_claw(0, 2047,35);   
+		set_motor_position_and_move_claw(1,600,20); 
+        go_to(0, 200, 20);
+
+
+    return 0;
+}
+
+
