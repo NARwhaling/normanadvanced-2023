@@ -1,6 +1,8 @@
 int main() 
 {
 
+// This file includes Norman Advanced Robotic's Arm and Drive Functions
+
 void arm_reset(int time)
 {
     motor(0, -20);
@@ -102,7 +104,95 @@ thread claw_slowT = thread_create(claw_slow);
      thread_destroy(motor_resistT);
      thread_destroy(claw_slowT);
  }
-    
+    void create_spin(int velocity)
+{
+	create_drive_direct(velocity, -1*velocity);
+}
+
+
+//positive angle spins the create clockwise
+void create_spin_angle(int speed, int angle)
+{
+	set_create_total_angle(0);
+	if(angle > 0)
+	{
+		create_spin(speed);
+	}
+	if(angle < 0)
+	{
+		create_spin(-1*speed);
+	}
+	int beginTime = systime();
+	while(abs(get_create_total_angle()) < abs(angle)) msleep(1);
+	int totTime = systime() - beginTime;
+	
+	printf("\nms per current angle: %d", totTime);
+	printf("\ncurrent angle: %d", get_create_total_angle());
+	create_stop();
+}
+
+//waits for the create button sensor to be touched
+void create_wait_for_bump(int velocity)
+{
+	while(get_create_lbump(0)!=1 || get_create_rbump(0)!=1)
+	{
+		if(get_create_lbump(0)==0 && get_create_rbump(0)==1)
+		{
+			create_drive(velocity,0);
+			msleep(100);
+		}
+		else if(get_create_lbump(0)==1 && get_create_rbump(0)==0)
+		{
+			create_drive(0,velocity);
+			msleep(100);
+		}
+		else if(get_create_lbump(0)!=1&& get_create_rbump(0)!=1)
+		{
+			create_drive_straight(velocity);
+			msleep(100);
+		}
+	}
+}
+
+void drive_until_range(int velocity, int target_range)
+{
+    while(analog(5) < target_range)
+    {
+        create_drive_segment(150, 100);
+        msleep(100);
+    }
+}
+
+// Shortened version of create_spin_angle
+void spin(int v, int theta)
+{
+    create_spin_angle(v, theta);
+    msleep(500);
+}
+
+// Shorted version of create_drive_segment
+void drive(int vel, int dist) // in mm
+{
+    create_drive_segment(vel, dist);
+    msleep(500);
+} 
+
+/*void set_up_arm_and_drive()
+{
+   
+   thread driveT = thread_create(get_to_tower);
+   thread set_posT = thread_create(set_pos);
+
+     thread_start(driveT); 
+     thread_start(set_posT); 
+
+     thread_wait(driveT);
+     thread_wait(set_posT);
+     thread_destroy(driveT);
+     thread_destroy(set_posT);
+   
+   }*/
+   
    
         go_to(0, 740, 20);
         set_motor_position_and_move_claw(1, 0,20); 
