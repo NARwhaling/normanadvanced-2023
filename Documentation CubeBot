@@ -1,110 +1,29 @@
 int main() 
 {
 
-// This file includes Norman Advanced Robotic's Arm and Drive Functions
-
-void arm_reset(int time)
+float create_get_charge()
 {
-    motor(0, -20);
-    msleep(time); 
+	return (float)get_create_battery_charge()/(float)get_create_battery_capacity()*100.0;
 }
 
-    
-void go_to(int port, int position, int speed)
+void create_drive_segment(int speed, int distance_mm)
 {
-clear_motor_position_counter(port);
+	set_create_distance(0);
+	if(distance_mm > 0)
+		create_drive_direct(speed, speed);//as of 2015, drive_direct is in millimeters per second
 
-void move_motor()
-{
-    while(get_motor_position_counter(port) < position)
-    {
-      motor(port, speed);
-    }    
-    while(get_motor_position_counter(port) > position)
-     {          
-       motor(port, -speed);
-     }
+	else if(distance_mm < 0)
+		create_drive_direct(-1*speed, -1*speed);
+
+	while(abs(get_create_distance()) < distance_mm) msleep(1);
+
+	/*msleep(abs(distance_mm)*1000/speed);//haha abs() is kinda nessecary. Almost a headache.*/
+	create_stop();
 }
-    move_motor();
 
-}
-   void claw_slow(int portC,int posC, int speedC) //port, position (0 - 2047), speed ( 0 - 30) is best 
-    {
-        enable_servos();
-        int curr_pos = get_servo_position(portC); 
 
-        if(curr_pos < posC)  //if position is less than - moves arm/claw up
-        {
-            while(curr_pos < posC) 
-            {
-                set_servo_position(portC, curr_pos); 
-                msleep(30);
-
-                curr_pos = curr_pos + speedC; //adds desired speed to the current position            
-            }
-        }
-
-        if(curr_pos > posC)
-        {
-            while(curr_pos > posC)//if position is greater than - moves arm/claw down
-            {
-                set_servo_position(portC, curr_pos);
-                msleep(30);
-
-                curr_pos = curr_pos - speedC; //subtracts desired speed to the current position             
-            }
-        }
-    }
-    //go_to(0, 800, 10);
-
- void set_motor_position_and_move_claw(int portC,int posC, int speedC)
- {
-     void claw_slow() //port, position (0 - 2047), speed ( 0 - 30) is best 
-    {
-        enable_servos();
-        int curr_pos = get_servo_position(portC); 
-
-        if(curr_pos < posC)  //if position is less than - moves arm/claw up
-        {
-            while(curr_pos < posC) 
-            {
-                set_servo_position(portC, curr_pos); 
-                msleep(30);
-
-                curr_pos = curr_pos + speedC; //adds desired speed to the current position            
-            }
-        }
-
-        if(curr_pos > posC)
-        {
-            while(curr_pos > posC)//if position is greater than - moves arm/claw down
-            {
-                set_servo_position(portC, curr_pos);
-                msleep(30);
-
-                curr_pos = curr_pos - speedC; //subtracts desired speed to the current position             
-            }
-        }
-    }
-void motor_resist() 
-{
-    double time = .0001;
-    motor(0, time);
-    msleep(3000);
-} 
-     
-thread motor_resistT = thread_create(motor_resist);
-thread claw_slowT = thread_create(claw_slow);
-
-     thread_start(motor_resistT); 
-     thread_start(claw_slowT); 
-
-     thread_wait(motor_resistT);
-     thread_wait(claw_slowT);
-     thread_destroy(motor_resistT);
-     thread_destroy(claw_slowT);
- }
-    void create_spin(int velocity)
+//positive speed spins the create clockwise.
+void create_spin(int velocity)
 {
 	create_drive_direct(velocity, -1*velocity);
 }
@@ -125,7 +44,7 @@ void create_spin_angle(int speed, int angle)
 	int beginTime = systime();
 	while(abs(get_create_total_angle()) < abs(angle)) msleep(1);
 	int totTime = systime() - beginTime;
-	
+
 	printf("\nms per current angle: %d", totTime);
 	printf("\ncurrent angle: %d", get_create_total_angle());
 	create_stop();
@@ -175,35 +94,188 @@ void drive(int vel, int dist) // in mm
 {
     create_drive_segment(vel, dist);
     msleep(500);
-} 
+}
 
-/*void set_up_arm_and_drive()
+void set_up_arm_and_drive()
 {
-   
+
    thread driveT = thread_create(get_to_tower);
    thread set_posT = thread_create(set_pos);
 
-     thread_start(driveT); 
-     thread_start(set_posT); 
+     thread_start(driveT);
+     thread_start(set_posT);
 
      thread_wait(driveT);
      thread_wait(set_posT);
      thread_destroy(driveT);
      thread_destroy(set_posT);
-   
-   }*/
-   
-   
-        go_to(0, 740, 20);
-        set_motor_position_and_move_claw(1, 0,20); 
+}
 
-        set_motor_position_and_move_claw(0, 0 ,35);   
-        set_motor_position_and_move_claw(1, 1600,20); 
+int claw_servo = 1;
+int mid_servo = 0;
+int claw_close_val = 0;
+int claw_open_val = 900;
+// start pos for mid servo is 1150
+void arm_reset(int time)
+{
+    motor(0, -20);
+    msleep(time);
+}
+
+void go_to(int port, int position, int speed)
+{
+clear_motor_position_counter(port);
+}
+void move_motor()
+{
+    while(get_motor_position_counter(port) < position)
+    {
+      motor(port, speed);
+    }
+    while(get_motor_position_counter(port) > position)
+     {
+       motor(port, -speed);
+     }
+}
+    move_motor();
+
+}
+
+   void claw_slow(int portC,int posC, int speedC) //port, position (0 - 2047), speed ( 0 - 30) is best
+    {
+        enable_servos();
+        int curr_pos = get_servo_position(portC);
+
+        if(curr_pos < posC)  //if position is less than - moves arm/claw up
+        {
+            while(curr_pos < posC)
+            {
+                set_servo_position(portC, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos + speedC; //adds desired speed to the current position
+            }
+        }
+
+        if(curr_pos > posC)
+        {
+            while(curr_pos > posC)//if position is greater than - moves arm/claw down
+            {
+                set_servo_position(portC, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos - speedC; //subtracts desired speed to the current position
+            }
+        }
+    }
+
+ void set_motor_position_and_move_claw(int portC,int posC, int speedC)
+ {
+     void claw_slow() //port, position (0 - 2047), speed ( 0 - 30) is best
+    {
+        enable_servos();
+        int curr_pos = get_servo_position(portC);
+
+        if(curr_pos < posC)  //if position is less than - moves arm/claw up
+        {
+            while(curr_pos < posC)
+            {
+                set_servo_position(portC, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos + speedC; //adds desired speed to the current position
+            }
+        }
+
+        if(curr_pos > posC)
+        {
+            while(curr_pos > posC)//if position is greater than - moves arm/claw down
+            {
+                set_servo_position(portC, curr_pos);
+                msleep(30);
+
+                curr_pos = curr_pos - speedC; //subtracts desired speed to the current position
+            }
+        }
+    }
+void motor_resist()
+{
+    double time = .0001;
+    motor(0, time);
+    msleep(2000);
+}
+
+thread motor_resistT = thread_create(motor_resist);
+thread claw_slowT = thread_create(claw_slow);
+
+     thread_start(motor_resistT);
+     thread_start(claw_slowT);
+
+     thread_wait(motor_resistT);
+     thread_wait(claw_slowT);
+     thread_destroy(motor_resistT);
+     thread_destroy(claw_slowT);
+ }
+
+void first_tower()
+    {
+        go_to(mid_servo, 350, 20); // moves arm to cube level
+
+        set_motor_position_and_move_claw(claw_servo, claw_open_val, 20); //open claw
+
+        go_to(mid_servo, 400, 20); // moves arm to cube level
+
+        set_motor_position_and_move_claw(mid_servo, 0 ,35);    //move to cube
+        set_motor_position_and_move_claw(claw_servo, claw_close_val, 20); //close claw
 
         go_to(0, -470, 20);
-        set_motor_position_and_move_claw(0, 2047,35);   
-		set_motor_position_and_move_claw(1,600,20); 
-        go_to(0, 200, 20);
+        set_motor_position_and_move_claw(mid_servo, 2000,35);  //positon claw horizontal to cube
+		    set_motor_position_and_move_claw(claw_servo, claw_open_val,20); //drop dat bih
+        //go_to(0, 100, 10);
+    }
+
+void second_tower()
+{
+            go_to(0, 260, 10);
+            set_motor_position_and_move_claw(mid_servo, 600,35);
+            set_motor_position_and_move_claw(claw_servo, claw_close_val, 20); //close claw
+			      go_to(0, -300, 20); // move arm
+            set_motor_position_and_move_claw(mid_servo, 2000,35); //positon claw horizontal to cube
+	        	set_motor_position_and_move_claw(claw_servo,claw_open_val,20); //open claw n drop cube
+
+}
+void third_tower()
+{
+            go_to(0, 260, 10);
+            set_motor_position_and_move_claw(mid_servo, 600,35);
+            set_motor_position_and_move_claw(claw_servo, claw_close_val, 20); //close claw
+			      go_to(0, -300, 20); // move arm
+            set_motor_position_and_move_claw(mid_servo, 2000,35); //positon claw horizontal to cube
+	        	set_motor_position_and_move_claw(claw_servo,claw_open_val,20); //open claw n drop cube
+
+}
+
+void fourth_tower()
+
+{
+
+          //go_to(mid_servo, 350, 20); // moves arm to cube level
+
+          //set_motor_position_and_move_claw(claw_servo, 900, 20); //open claw
+
+          go_to(mid_servo, 400, 20); // moves arm to cube level
+
+          set_motor_position_and_move_claw(mid_servo, 0 ,35);    //move to cube
+          set_motor_position_and_move_claw(claw_servo, claw_close_val, 20); //close claw
+
+          go_to(0, -470, 20);
+          set_motor_position_and_move_claw(mid_servo, 2000,35);
+  		    set_motor_position_and_move_claw(claw_servo,claw_open_val,20);
+          //go_to(0, 100, 10);
+
+}
+  
+
 
 
     return 0;
